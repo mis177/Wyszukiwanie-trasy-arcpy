@@ -7,13 +7,14 @@ roads = "L4_1_BDOT10k__OT_SKDR_L.shp"
 
 
 class Edge:
-    def __init__(self, id, node_from, node_to, length, road_class, dir):
+    def __init__(self, id, node_from, node_to, length, road_class, dir, korek):
         self.id = id
         self.node_from = node_from
         self.node_to = node_to
         self.length = length
         self.road_class = road_class
         self.direction = dir
+        self.opoznienie = korek
 
     def get_end(self, node):
         return self.node_from if node == self.node_to.id else self.node_to
@@ -22,16 +23,17 @@ class Edge:
         return self.length
 
     def cost_time(self):
-        return float(self.length/speed[self.road_class])
+        return (self.length/speed[self.road_class]) + self.opoznienie
 
-speed = {"A": 140,
-        "S": 120,
-        "GP": 100,
-        "G": 60,
-        "Z": 50,
-        "L": 40,
-        "D": 30,
-        "I": 20}
+speed = {"A": 140 * 1000 / 60,
+        "S": 120 * 1000 / 60,
+        "GP": 100 * 1000 / 60,
+        "G": 60 * 1000 / 60,
+        "Z": 50 * 1000 / 60,
+        "L": 40 * 1000 / 60,
+        "l": 20 * 1000 / 60,
+        "D": 30 * 1000 / 60,
+        "I": 20 * 1000 / 60}
 
 
 class Node:
@@ -47,7 +49,7 @@ class Node:
 
 
 def heuristic(a, a2, b, b2):
-    return math.sqrt((b - a) ** 2 + (b2 - a2) ** 2)
+    return math.sqrt((b - a) * 2 + (b2 - a2) * 2)
 
 
 def reconstruct_path(edge_from, came_from, current):
@@ -59,7 +61,7 @@ def reconstruct_path(edge_from, came_from, current):
         path_edg.append(edge_from[current])
         path_length = path_length + edges[edge_from[current]].cost_length()
         current = came_from[current]
-    return path_edg
+    return path_edg #path_length
 
 
 def a(edg, start, end, option):
@@ -90,7 +92,7 @@ def a(edg, start, end, option):
                 if option == 'dlugosc':
                     fscore = tentative_g_score + heuristic(igrek.x, igrek.y, end.x, end.y)
                 elif option == 'czas':
-                    fscore = tentative_g_score + heuristic(igrek.x, igrek.y, end.x, end.y)/70
+                    fscore = tentative_g_score + heuristic(igrek.x, igrek.y, end.x, end.y) / (120 * 1000 / 60)
                 heapq.heappush(heap, (fscore, igrek))
     return False
 
@@ -112,6 +114,7 @@ with arcpy.da.SearchCursor(roads, ['ID1', 'klasaDrogi', "SHAPE@"]) as cursor:
         if dire > 3:
             dire = 0
 
+        dire = 0
         if (str(x_start) + "," + str(y_start)) in nodes:
             if dire == 0 or dire == 1:
                 nodes[(str(x_start) + "," + str(y_start))].edges.append(id)
@@ -128,7 +131,7 @@ with arcpy.da.SearchCursor(roads, ['ID1', 'klasaDrogi', "SHAPE@"]) as cursor:
             if dire == 1 or dire == 3:
                 nodes[str(x_last) + "," + str(y_last)].edges.remove(id)
 
-        edges[id] = Edge(id, nodes[(str(x_start) + "," + str(y_start))], nodes[(str(x_last) + "," + str(y_last))], length, road_class, dire)
+        edges[id] = Edge(id, nodes[(str(x_start) + "," + str(y_start))], nodes[(str(x_last) + "," + str(y_last))], length, road_class, dire, 0)
 
 print("wczytane")
 
@@ -165,8 +168,42 @@ opcja = raw_input('Trasa wedlug dlugosc/czas:')
 
 b = (a(edges, start, end, opcja))
 
+czy_korek = raw_input('Jest korek(tak/nie)?')
+
+if b and czy_korek == 'tak':
+    korek_dlugosc = float(raw_input('Jak dlugi jest korek?'))
+    korek_czas = float(raw_input('Ile traci sie czasu(minuty)?'))
+    korek_poczatek = korek_dlugosc
+    for i in range (1,1000):
+        if float(edges[b[-i]].length) <= korek_dlugosc:
+            korek_dlugosc = korek_dlugosc - float(edges[b[-i]].length)
+            czesc_korka = float(edges[b[-i]].length) / korek_poczatek
+            edges[b[-i]].opoznienie = int(korek_czas * czesc_korka)
+        else:
+            edges[b[-i]].opoznienie = int(korek_czas * (1 - czesc_korka))
+            b = (a(edges, start, end, opcja))
+            break
+array = arcpy.Array()
+second = arcpy.Point()
+
 if b:
     qry = """ID1 IN {0}""".format(str(tuple(b)))
     arcpy.Select_analysis(roads, "D:/pagpag/trasa.shp", qry)
+    array.add(start_point)
+    second.X = start.x
+    second.Y = start.y
+    array.add(second)
+    polyline = arcpy.Polyline(array)
+    arcpy.CreateFeatureclass_management("D:\pagpag", "start_stop_line.shp", "POLYLINE", spatial_reference=roads)
+    cursor = arcpy.da.InsertCursor('D:\pagpag\start_stop_line.shp', ['SHAPE@'])
+    cursor.insertRow([polyline])
+    array.removeAll()
+    second.X = end.x
+    second.Y = end.y
+    array.add(second)
+    array.add(end_point)
+    polyline_end = arcpy.Polyline(array)
+    cursor.insertRow([polyline_end])
+    del cursor
 else:
     print("Droga nieznaleziona")
