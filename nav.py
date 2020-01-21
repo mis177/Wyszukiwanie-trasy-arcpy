@@ -141,7 +141,6 @@ with arcpy.da.SearchCursor(roads, ['ID1', 'klasaDrogi', "SHAPE@"]) as cursor:
         if dire > 3:
             dire = 0
 
-        dire = 0
         if (str(x_start) + "," + str(y_start)) in nodes:
             if dire == 0 or dire == 1:
                 nodes[(str(x_start) + "," + str(y_start))].edges.append(id)
