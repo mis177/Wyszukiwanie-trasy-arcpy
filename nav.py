@@ -193,10 +193,10 @@ end = edges[closest[1] + 1].node_to if to_end < from_end else edges[closest[1] +
 
 opcja = raw_input('Trasa wedlug dlugosc/czas:')
 
-#start_time = time.time()
+start_time = time.time()
 b = (a(edges, start, end, opcja))
 #b = dijkstry(edges,start,end)
-#print("--- %s seconds ---" % (time.time() - start_time))
+print("--- Algorytm wykonano w %s sekund ---" % (time.time() - start_time))
 czy_korek = raw_input('Jest korek(tak/nie)?')
 
 if b and czy_korek == 'tak':
