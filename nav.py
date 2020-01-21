@@ -2,6 +2,7 @@ import arcpy
 import heapq
 import math
 import random
+import time
 arcpy.env.workspace = "D:\pagpag"
 roads = "L4_1_BDOT10k__OT_SKDR_L.shp"
 
@@ -49,7 +50,7 @@ class Node:
 
 
 def heuristic(a, a2, b, b2):
-    return math.sqrt((b - a) * 2 + (b2 - a2) * 2)
+    return math.sqrt((b - a) ** 2 + (b2 - a2) ** 2)
 
 
 def reconstruct_path(edge_from, came_from, current):
@@ -94,6 +95,32 @@ def a(edg, start, end, option):
                 elif option == 'czas':
                     fscore = tentative_g_score + heuristic(igrek.x, igrek.y, end.x, end.y) / (120 * 1000 / 60)
                 heapq.heappush(heap, (fscore, igrek))
+    return False
+
+
+def dijkstry(edg, start, end):
+    closed_set = set()
+    start.gscore = 0
+    came_from = {}
+    edge_from = {}
+    heap = []
+    heap.append((0, start))
+    while heap:
+        iks = heapq.heappop(heap)[1]
+        if iks.id == end.id:
+            return reconstruct_path(edge_from, came_from, end)
+        closed_set.add(iks)
+        neighbours = iks.get_neighbours()
+        for next in neighbours:
+            igrek = edg[next].get_end((str(iks.x) + "," + str(iks.y)))
+            tentative_g_score = iks.gscore + edges[next].cost_length()
+            if igrek in closed_set:
+                continue
+            if tentative_g_score < igrek.gscore or igrek not in [i[1]for i in heap]:
+                came_from[igrek] = iks
+                edge_from[igrek] = next
+                igrek.gscore = tentative_g_score
+                heapq.heappush(heap, (tentative_g_score, igrek))
     return False
 
 edges = {}
@@ -166,8 +193,10 @@ end = edges[closest[1] + 1].node_to if to_end < from_end else edges[closest[1] +
 
 opcja = raw_input('Trasa wedlug dlugosc/czas:')
 
+#start_time = time.time()
 b = (a(edges, start, end, opcja))
-
+#b = dijkstry(edges,start,end)
+#print("--- %s seconds ---" % (time.time() - start_time))
 czy_korek = raw_input('Jest korek(tak/nie)?')
 
 if b and czy_korek == 'tak':
@@ -188,7 +217,7 @@ second = arcpy.Point()
 
 if b:
     qry = """ID1 IN {0}""".format(str(tuple(b)))
-    arcpy.Select_analysis(roads, "D:/pagpag/trasa.shp", qry)
+    arcpy.Select_analysis(roads, "D:/pagpag/trasa2.shp", qry)
     array.add(start_point)
     second.X = start.x
     second.Y = start.y
